@@ -1,20 +1,24 @@
 #include <stdio.h>
 #include <string.h>
-#include "mymalloc.h"
+#include "umalloc.h"
 
 void printadd(void* ptr){
   printf("the address is %d\n", ptr);
 }
 
 int main(int argc, char** argv){
-  myinit(0);
-  char* test = alloc(5);
+  myinit();
+  memdump();
+  char* test = malloc(5);
   strcpy(test, "word");
-  printf("test contents: %s\n", test);
-  char* second = alloc(9);
-  printadd(second);
-  myfree(second);
-  myfree(second);
-  dump_heap();
+  memdump();
+  char* test2 = malloc(5);
+  memdump();
+  free(test);
+  memdump();
+  free(test2);
+  memdump();
+
+
   return 0;
 }

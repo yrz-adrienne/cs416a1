@@ -1,9 +1,23 @@
+CC = gcc
+CFLAGS = -g -c
+AR = ar -rc
+RANLIB = ranlib
 
-CFLAGS = -g -Wall -Wvla -fsanitize=address
+all: umalloc.a driver memgrind
 
-driver : driver.c	mymalloc.o
-	gcc $(CFLAGS) -o driver driver.c 
+umalloc.a: umalloc.o 
+	$(AR) libumalloc.a umalloc.o 
+	$(RANLIB) libumalloc.a
 
-%.o: %.c
-	gcc -c -o $@ $<
+memgrind:
+	$(CC) -o memgrind memgrind.c -L./ -lumalloc 
 
+umalloc.o: umalloc.h
+	$(CC) $(CFLAGS) umalloc.c
+
+driver: 
+	$(CC) -o driver driver.c -L./ -lumalloc
+
+
+clean:
+	rm -rf driver memgrind *.o *.a
