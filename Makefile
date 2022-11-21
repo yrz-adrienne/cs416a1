@@ -18,6 +18,5 @@ umalloc.o: umalloc.h
 driver: 
 	$(CC) -o driver driver.c -L./ -lumalloc
 
-
 clean:
 	rm -rf driver memgrind *.o *.a

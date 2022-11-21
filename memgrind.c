@@ -41,10 +41,10 @@ void basic_coalescence(){
     int* quarter = (int*)malloc(max/4); 
     free(half); 
     free(quarter); 
-    int* max = (int*)malloc(max); 
-    if(max != NULL){
+    int* max_pointer = (int*)malloc(max); 
+    if(max_pointer != NULL){
         printf("basic coalescence test: success \n");
-        free(max); 
+        free(max_pointer); 
     }
 }
 
@@ -88,6 +88,5 @@ int main(int argc, char** argv){
     saturation();
     time_overhead();
     intermediate_coalescence();
-
     return 0;
 }

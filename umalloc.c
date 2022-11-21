@@ -1,4 +1,5 @@
 #include "umalloc.h"
+#include <signal.h>
 
 //original setup
 const int shift = 31; //using unsigned int
@@ -6,9 +7,16 @@ unsigned int taken = 0b1 << shift;
 
 static char mem[MEM_SIZE]; 
 char init = '\0'; 
+int s_line; 
+char * s_file; 
 
 unsigned int rem(unsigned int x){
 
+}
+
+void sigsegv_handler(){
+  printf("Error on free: attempted to free a invalid pointer from line %d, file %s\n", s_line, s_file); 
+  exit(-1); 
 }
 
 void myinit(){
@@ -19,6 +27,7 @@ void myinit(){
   if(DEBUG){
     printf("initialized\n"); 
   }
+  signal(SIGSEGV, sigsegv_handler); 
 }
 
 void print_header(int i) {
@@ -60,9 +69,7 @@ void memdump(){
 void* umalloc(size_t bytes, char* file, int line){
   if(bytes == 0 || bytes > (MEM_SIZE) - 4){
     // return null if the size is 0 or if more bytes than possible are requested
-    if (DEBUG) {
-      printf("nothing allocated\n");
-    }
+    printf("Error on malloc: The amount requested is impossible (0 or > memory size) from line %d, file %s\n", line, file); 
     return NULL;
   }
   else{
@@ -71,36 +78,50 @@ void* umalloc(size_t bytes, char* file, int line){
       myinit(); 
     }
 
+    unsigned int free_mem = 0;
     int currIndex = 0;
     while(currIndex<MEM_SIZE){
       unsigned int *curr_chunk = getchunk(currIndex);
       unsigned int chunk_size_bytes = chunksize(currIndex);
       unsigned int chunk_taken = isallocated(currIndex); 
-      if(!chunk_taken && chunk_size_bytes >= bytes){
-        unsigned int rem_size = chunk_size_bytes - (bytes + 4); 
-        if(rem_size > 0 && rem_size < chunk_size_bytes){ // underflow case
-          if (DEBUG) {
-            printf("splitting the block\n");
+      if(!chunk_taken){
+        if(chunk_size_bytes >= bytes){
+          unsigned int rem_size = chunk_size_bytes - (bytes + 4); 
+          if(rem_size > 0 && rem_size < chunk_size_bytes){ // underflow case
+            if (DEBUG) {
+              printf("splitting the block\n");
+            }
+            // if we can break the block into two chunks 
+            // then set up the next chunk
+            *curr_chunk = taken | bytes;  // current one is in use
+            unsigned int* next_chunk = getchunk(currIndex + bytes + 4);  // the next block that can be used
+            *next_chunk = rem_size;
           }
-          // if we can break the block into two chunks 
-          // then set up the next chunk
-          *curr_chunk = taken | bytes;  // current one is in use
-          unsigned int* next_chunk = getchunk(currIndex + bytes + 4);  // the next block that can be used
-          *next_chunk = rem_size;
+          else{
+            if (DEBUG) {
+              printf("not splitting\n");
+            }
+            // not big enough of a space to split into two chunks
+            *curr_chunk = taken | chunk_size_bytes; //mark current as in use
+          }
+          return curr_chunk + 4; 
         }
         else{
-          if (DEBUG) {
-            printf("not splitting\n");
-          }
-          // not big enough of a space to split into two chunks
-          *curr_chunk = taken | chunk_size_bytes; //mark current as in use
+          free_mem+=chunk_size_bytes; 
         }
-        return curr_chunk + 4; 
       }
-
       // increment the index of the chunks to the next
       // size of the chunk in bytes + 4 for metadata
       currIndex += chunk_size_bytes + 4;
+    }
+    if(free_mem == 0){
+      printf("Error on malloc: no free memory from line %d, file %s\n", line, file); 
+    }
+    else if(free_mem > bytes){
+      printf("Error on malloc: there is enough free memory but no block large enough from line %d, file %s\n", line, file); 
+    }
+    else{
+      printf("Error on malloc: memory is not full but not enough free memory from line %d, file %s\n", line, file); 
     }
     return NULL;
   }
@@ -108,12 +129,15 @@ void* umalloc(size_t bytes, char* file, int line){
 
 // how would you detect if you tried to free something that's not a pointer??
 void ufree(void* ptr, char * file, int line){
+  s_file = file; 
+  s_line = line; 
   unsigned int* target = ptr;
   target -= 4;
   if(ptr == NULL){
-    printf("Error on free: attempted to free() a null pointer from %d, file %s\n", line, file); 
+    printf("Error on free: attempted to free() a null pointer from line %d, file %s\n", line, file); 
     return;
   }
+  unsigned int test = *target; //try to cause a seg fault
   int i = 0;
   int prev = -1; 
   while(i<MEM_SIZE){
@@ -122,7 +146,7 @@ void ufree(void* ptr, char * file, int line){
     unsigned int chunk_taken = (*curr_chunk & taken) >> shift;
       if(target == curr_chunk){
         if(DEBUG){
-          printf("match found at address: %d\n", ptr);
+          printf("match found at address: %p\n", ptr);
         }
         if(!chunk_taken){ // we cannot free unallocated memory
           printf("Error on free: attempted to free() an unallocated block from line %d, file %s\n", line, file); 
